@@ -22,21 +22,9 @@ const AlertsManager: React.FC = () => {
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAlerts, setSelectedAlerts] = useState<string[]>([]);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadAlerts();
-    
-    // Set up real-time refresh every 30 seconds
-    const interval = setInterval(() => {
-      loadAlerts();
-    }, 30000);
-    
-    setRefreshInterval(interval);
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
   }, [filter]);
 
   const loadAlerts = async () => {
@@ -174,214 +162,213 @@ const AlertsManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Alerts & Notifications</h1>
-          <p className="text-gray-600">Monitor and manage system alerts</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-500">Auto-refresh: 30s</p>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Filter:</span>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Alerts</option>
-              <option value="active">Active</option>
-              <option value="acknowledged">Acknowledged</option>
-              <option value="resolved">Resolved</option>
-              <option value="dismissed">Dismissed</option>
-            </select>
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Alerts & Notifications</h1>
+            <p className="text-gray-600">Monitor and manage system alerts</p>
           </div>
+        </div>
 
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search alerts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {selectedAlerts.length > 0 && (
+        {/* Filters and Search */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">{selectedAlerts.length} selected</span>
-              <button
-                onClick={() => handleBulkAction('acknowledge')}
-                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-600">Filter:</span>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                Acknowledge
-              </button>
-              <button
-                onClick={() => handleBulkAction('resolve')}
-                className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-              >
-                Resolve
-              </button>
+                <option value="all">All Alerts</option>
+                <option value="active">Active</option>
+                <option value="acknowledged">Acknowledged</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Alerts List */}
-      <div className="space-y-3">
-        {filteredAlerts.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
-            <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No alerts found</h3>
-            <p className="text-gray-600">
-              {filter === 'all' ? 'No alerts to display' : `No ${filter} alerts found`}
-            </p>
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search alerts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {selectedAlerts.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">{selectedAlerts.length} selected</span>
+                <button
+                  onClick={() => handleBulkAction('acknowledge')}
+                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Acknowledge
+                </button>
+                <button
+                  onClick={() => handleBulkAction('resolve')}
+                  className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Resolve
+                </button>
+              </div>
+            )}
           </div>
-        ) : (
-          filteredAlerts.map((alert) => (
-            <div
-              key={alert.id}
-              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3 flex-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedAlerts.includes(alert.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedAlerts(prev => [...prev, alert.id]);
-                      } else {
-                        setSelectedAlerts(prev => prev.filter(id => id !== alert.id));
-                      }
-                    }}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  
-                  <div className="flex-shrink-0 mt-1">
-                    {getAlertIcon(alert.type)}
+        </div>
+
+        {/* Alerts List */}
+        <div className="space-y-3 mb-6">
+          {filteredAlerts.length === 0 ? (
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+              <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No alerts found</h3>
+              <p className="text-gray-600">
+                {filter === 'all' ? 'No alerts to display' : `No ${filter} alerts found`}
+              </p>
+            </div>
+          ) : (
+            filteredAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedAlerts.includes(alert.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedAlerts(prev => [...prev, alert.id]);
+                        } else {
+                          setSelectedAlerts(prev => prev.filter(id => id !== alert.id));
+                        }
+                      }}
+                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    
+                    <div className="flex-shrink-0 mt-1">
+                      {getAlertIcon(alert.type)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-sm font-medium text-gray-900 truncate">
+                          {alert.title}
+                        </h3>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(alert.priority)}`}>
+                          {alert.priority}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(alert.status)}`}>
+                          {alert.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
+                      
+                      <div className="flex items-center space-x-4 text-xs text-gray-500">
+                        <span>Category: {alert.category}</span>
+                        {alert.assetName && <span>Asset: {alert.assetName}</span>}
+                        <span>Created: {new Date(alert.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {alert.title}
-                      </h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(alert.priority)}`}>
-                        {alert.priority}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(alert.status)}`}>
-                        {alert.status}
-                      </span>
-                    </div>
+                  <div className="flex items-center space-x-2 ml-4">
+                    {alert.status === 'active' && (
+                      <>
+                        <button
+                          onClick={() => handleAlertAction(alert.id, 'acknowledge')}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Acknowledge"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleAlertAction(alert.id, 'resolve')}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="Resolve"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                     
-                    <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
+                    <button
+                      onClick={() => handleAlertAction(alert.id, 'dismiss')}
+                      className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                      title="Dismiss"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                     
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
-                      <span>Category: {alert.category}</span>
-                      {alert.assetName && <span>Asset: {alert.assetName}</span>}
-                      <span>Created: {new Date(alert.createdAt).toLocaleDateString()}</span>
-                    </div>
+                    <button className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-2 ml-4">
-                  {alert.status === 'active' && (
-                    <>
-                      <button
-                        onClick={() => handleAlertAction(alert.id, 'acknowledge')}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Acknowledge"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleAlertAction(alert.id, 'resolve')}
-                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                        title="Resolve"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                  
-                  <button
-                    onClick={() => handleAlertAction(alert.id, 'dismiss')}
-                    className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors"
-                    title="Dismiss"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  
-                  <button className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Bell className="w-8 h-8 text-blue-500" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Total Alerts</p>
-              <p className="text-2xl font-semibold text-gray-900">{alerts.length}</p>
-            </div>
-          </div>
+            ))
+          )}
         </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Active</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {alerts.filter(a => a.status === 'active').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Resolved</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {alerts.filter(a => a.status === 'resolved').length}
-              </p>
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Bell className="w-8 h-8 text-blue-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Total Alerts</p>
+                <p className="text-2xl font-semibold text-gray-900">{alerts.length}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Active</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {alerts.filter(a => a.status === 'active').length}
+                </p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Critical</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {alerts.filter(a => a.priority === 'critical').length}
-              </p>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Resolved</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {alerts.filter(a => a.status === 'resolved').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-8 h-8 text-yellow-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Critical</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {alerts.filter(a => a.priority === 'critical').length}
+                </p>
+              </div>
             </div>
           </div>
         </div>
