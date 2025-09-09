@@ -1,490 +1,467 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, CheckCircle, XCircle, FileText, Calendar, Users, Plus, Edit, Trash2 } from 'lucide-react';
-import { ComplianceStatus, ComplianceType } from '../../types';
-import apiService from '../../services/api';
+import { Bell, AlertTriangle, CheckCircle, X, Filter, Search, MoreVertical } from 'lucide-react';
 import supabaseService from '../../services/supabaseService';
 
-interface ComplianceCheck {
+interface Alert {
   id: string;
-  type: ComplianceType;
-  status: ComplianceStatus;
-  lastChecked: string;
-  nextCheck: string;
-  auditor: string;
-  notes?: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  status: 'active' | 'acknowledged' | 'resolved' | 'dismissed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  createdAt: string;
+  updatedAt: string;
+  category: string;
+  assetId?: string;
+  assetName?: string;
 }
 
-interface PolicyViolation {
-  id: string;
-  type: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  description: string;
-  detectedDate: string;
-  resolvedDate?: string;
-  assignedTo: string;
-  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
-}
-
-interface ComplianceManagerProps {
-  assets: any[];
-  licenses: any[];
-}
-
-export default function ComplianceManager({ assets, licenses }: ComplianceManagerProps) {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [complianceChecks, setComplianceChecks] = useState<ComplianceCheck[]>([]);
-  const [policyViolations, setPolicyViolations] = useState<PolicyViolation[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+const AlertsManager: React.FC = () => {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAlerts, setSelectedAlerts] = useState<string[]>([]);
 
   useEffect(() => {
-    loadComplianceData();
-    
-    // Set up real-time refresh every 60 seconds
-    const interval = setInterval(() => {
-      loadComplianceData();
-    }, 60000);
-    
-    setRefreshInterval(interval);
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, []);
+    loadAlerts();
+  }, [filter]);
 
-  const loadComplianceData = async () => {
+  const loadAlerts = async () => {
     setLoading(true);
     try {
-      // Load compliance checks from Supabase
-      const checksData = await supabaseService.getComplianceChecks();
-      if (checksData) {
-        const transformedChecks = checksData.map(check => ({
-          id: check.id,
-          type: check.type as ComplianceType,
-          status: check.status as ComplianceStatus,
-          lastChecked: check.last_checked,
-          nextCheck: check.next_check || '',
-          auditor: check.auditor,
-          notes: check.notes
+      const alertsData = await supabaseService.getAlerts();
+      if (alertsData) {
+        const transformedAlerts = alertsData.map(alert => ({
+          id: alert.id,
+          title: alert.title,
+          message: alert.message,
+          type: alert.type as Alert['type'],
+          status: alert.status as Alert['status'],
+          priority: alert.priority as Alert['priority'],
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          category: alert.category,
+          assetId: alert.asset_id,
+          assetName: alert.asset_name
         }));
-        setComplianceChecks(transformedChecks);
+        setAlerts(transformedAlerts);
       } else {
-        generateSampleComplianceData();
-      }
-
-      // Load policy violations from Supabase
-      const violationsData = await supabaseService.getPolicyViolations();
-      if (violationsData) {
-        const transformedViolations = violationsData.map(violation => ({
-          id: violation.id,
-          type: violation.type,
-          severity: violation.severity as PolicyViolation['severity'],
-          description: violation.description,
-          detectedDate: violation.detected_date,
-          resolvedDate: violation.resolved_date || undefined,
-          assignedTo: violation.assigned_to,
-          status: violation.status as PolicyViolation['status']
-        }));
-        setPolicyViolations(transformedViolations);
-      } else {
-        generateSampleViolations();
+        setAlerts([]);
       }
     } catch (error) {
-      console.warn('Failed to load compliance data, using sample data');
-      generateSampleComplianceData();
-      generateSampleViolations();
+      console.error('Failed to load alerts:', error);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const generateSampleComplianceData = () => {
-    setComplianceChecks([]);
-  };
-
-  const generateSampleViolations = () => {
-    setPolicyViolations([]);
-  };
-
-  const handleCreateComplianceCheck = async (checkData: Omit<ComplianceCheck, 'id'>) => {
+  const handleAlertAction = async (alertId: string, action: 'acknowledge' | 'resolve' | 'dismiss') => {
     try {
-      const response = await supabaseService.createComplianceCheck({
-        type: checkData.type,
-        status: checkData.status,
-        last_checked: checkData.lastChecked,
-        next_check: checkData.nextCheck || null,
-        auditor: checkData.auditor,
-        notes: checkData.notes || ''
-      });
-      
-      if (response) {
-        const transformedCheck: ComplianceCheck = {
-          id: response.id,
-          type: response.type as ComplianceType,
-          status: response.status as ComplianceStatus,
-          lastChecked: response.last_checked,
-          nextCheck: response.next_check || '',
-          auditor: response.auditor,
-          notes: response.notes
-        };
-        setComplianceChecks(prev => [...prev, transformedCheck]);
-      } else {
-        const newCheck: ComplianceCheck = {
-          ...checkData,
-          id: Date.now().toString()
-        };
-        setComplianceChecks(prev => [...prev, newCheck]);
+      switch (action) {
+        case 'acknowledge':
+          await supabaseService.acknowledgeAlert(alertId);
+          break;
+        case 'resolve':
+          await supabaseService.resolveAlert(alertId);
+          break;
+        case 'dismiss':
+          await supabaseService.dismissAlert(alertId);
+          break;
       }
+
+      setAlerts(prev => prev.map(alert => 
+        alert.id === alertId 
+          ? { ...alert, status: action === 'acknowledge' ? 'acknowledged' : action === 'resolve' ? 'resolved' : 'dismissed' }
+          : alert
+      ));
     } catch (error) {
-      console.warn('Failed to create compliance check, using local state');
-      const newCheck: ComplianceCheck = {
-        ...checkData,
-        id: Date.now().toString()
-      };
-      setComplianceChecks(prev => [...prev, newCheck]);
+      console.error(`Failed to ${action} alert:`, error);
     }
   };
 
-  const handleResolveViolation = async (violationId: string) => {
+  const handleBulkAction = async (action: string) => {
+    if (selectedAlerts.length === 0) return;
+
     try {
-      await supabaseService.resolvePolicyViolation(violationId);
+      // Update each alert individually since we don't have bulk update in supabaseService
+      for (const alertId of selectedAlerts) {
+        if (action === 'acknowledge') {
+          await supabaseService.acknowledgeAlert(alertId);
+        } else if (action === 'resolve') {
+          await supabaseService.resolveAlert(alertId);
+        } else if (action === 'dismiss') {
+          await supabaseService.dismissAlert(alertId);
+        }
+      }
       
-      setPolicyViolations(prev => prev.map(violation => 
-        violation.id === violationId 
-          ? { ...violation, status: 'Resolved', resolvedDate: new Date().toISOString() }
-          : violation
-      ));
+      loadAlerts();
+      setSelectedAlerts([]);
     } catch (error) {
-      console.warn('Failed to resolve violation via Supabase, updating locally');
-      setPolicyViolations(prev => prev.map(violation => 
-        violation.id === violationId 
-          ? { ...violation, status: 'Resolved', resolvedDate: new Date().toISOString() }
-          : violation
-      ));
+      console.error('Failed to perform bulk action:', error);
     }
   };
 
-  const getStatusColor = (status: ComplianceStatus) => {
+  const filteredAlerts = alerts.filter(alert => {
+    const matchesFilter = filter === 'all' || alert.status === filter;
+    const matchesSearch = searchTerm === '' || 
+      alert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      alert.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      alert.category.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesFilter && matchesSearch;
+  });
+
+  const getAlertIcon = (type: Alert['type']) => {
+    switch (type) {
+      case 'error':
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      default:
+        return <Bell className="w-5 h-5 text-blue-500" />;
+    }
+  };
+
+  const getPriorityColor = (priority: Alert['priority']) => {
+    switch (priority) {
+      case 'critical':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status: Alert['status']) => {
     switch (status) {
-      case 'Compliant': return 'text-green-600 bg-green-100';
-      case 'Non-Compliant': return 'text-red-600 bg-red-100';
-      case 'Under Review': return 'text-yellow-600 bg-yellow-100';
-      case 'Remediation Required': return 'text-orange-600 bg-orange-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'resolved':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'acknowledged':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'dismissed':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-red-100 text-red-800 border-red-200';
     }
   };
 
-  const getStatusIcon = (status: ComplianceStatus) => {
-    switch (status) {
-      case 'Compliant': return <CheckCircle className="w-5 h-5" />;
-      case 'Non-Compliant': return <XCircle className="w-5 h-5" />;
-      case 'Under Review': return <AlertTriangle className="w-5 h-5" />;
-      case 'Remediation Required': return <AlertTriangle className="w-5 h-5" />;
-      default: return <Shield className="w-5 h-5" />;
-    }
-  };
-
-  const complianceScore = complianceChecks.length > 0 ? 
-    (complianceChecks.filter(c => c.status === 'Compliant').length / complianceChecks.length) * 100 : 100;
-
-  const criticalViolations = policyViolations.filter(v => v.severity === 'Critical' && v.status === 'Open');
-  const openViolations = policyViolations.filter(v => v.status === 'Open');
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Compliance & Audits</h1>
-          <p className="text-gray-600">Monitor compliance status and manage policy violations</p>
-        </div>
-        <div className="flex items-center space-x-6">
-          <div className="text-right">
-            <p className="text-xs text-gray-500">Auto-refresh: 60s</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="bg-white px-4 py-2 rounded-lg border border-gray-200">
-              <div className="text-2xl font-bold text-green-600">{complianceScore.toFixed(1)}%</div>
-              <div className="text-sm text-gray-600">Compliance Score</div>
-            </div>
-            <button
-              onClick={() => handleCreateComplianceCheck({
-                type: 'License Compliance',
-                status: 'Under Review',
-                lastChecked: new Date().toISOString(),
-                nextCheck: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                auditor: 'System Administrator'
-              })}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Check</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Compliance Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-green-600">
-                {complianceChecks.filter(c => c.status === 'Compliant').length}
-              </div>
-              <div className="text-sm font-medium text-green-700">Compliant</div>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-600" />
+    <div className="space-y-6">
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Alerts & Notifications</h1>
+            <p className="text-gray-600">Monitor and manage system alerts</p>
           </div>
         </div>
 
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-red-600">{criticalViolations.length}</div>
-              <div className="text-sm font-medium text-red-700">Critical Issues</div>
-            </div>
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-          </div>
-        </div>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-yellow-600">{openViolations.length}</div>
-              <div className="text-sm font-medium text-yellow-700">Open Violations</div>
-            </div>
-            <XCircle className="w-8 h-8 text-yellow-600" />
-          </div>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-blue-600">{complianceChecks.length}</div>
-              <div className="text-sm font-medium text-blue-700">Total Checks</div>
-            </div>
-            <Shield className="w-8 h-8 text-blue-600" />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
-            {[
-              { id: 'overview', label: 'Overview', icon: <Shield className="w-4 h-4" /> },
-              { id: 'checks', label: 'Compliance Checks', icon: <CheckCircle className="w-4 h-4" /> },
-              { id: 'violations', label: 'Policy Violations', icon: <AlertTriangle className="w-4 h-4" /> },
-              { id: 'audits', label: 'Audit Reports', icon: <FileText className="w-4 h-4" /> }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+        {/* Filters and Search */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-600">Filter:</span>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
+                <option value="all">All Alerts</option>
+                <option value="active">Active</option>
+                <option value="acknowledged">Acknowledged</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
+            </div>
+
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search alerts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {selectedAlerts.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">{selectedAlerts.length} selected</span>
+                <button
+                  onClick={() => handleBulkAction('acknowledge')}
+                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Acknowledge
+                </button>
+                <button
+                  onClick={() => handleBulkAction('resolve')}
+                  className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Resolve
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="p-6">
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Compliance Score Chart */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Compliance Score Breakdown</h3>
-                  <div className="space-y-4">
-                    {['License Compliance', 'Security Compliance', 'Regulatory Compliance', 'Policy Compliance'].map((type) => {
-                      const typeChecks = complianceChecks.filter(c => c.type === type);
-                      const typeScore = typeChecks.length > 0 ? 
-                        (typeChecks.filter(c => c.status === 'Compliant').length / typeChecks.length) * 100 : 100;
-                      
-                      return (
-                        <div key={type} className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium text-gray-700">{type}</span>
-                            <span className="text-sm text-gray-500">{typeScore.toFixed(1)}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                typeScore >= 90 ? 'bg-green-600' : 
-                                typeScore >= 70 ? 'bg-yellow-600' : 'bg-red-600'
-                              }`}
-                              style={{ width: `${typeScore}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+        {/* Alerts List */}
+        <div className="space-y-3 mb-6">
+          {filteredAlerts.length === 0 ? (
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+              <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No alerts found</h3>
+              <p className="text-gray-600">
+                {filter === 'all' ? 'No alerts to display' : `No ${filter} alerts found`}
+              </p>
+            </div>
+          ) : (
+            filteredAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedAlerts.includes(alert.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedAlerts(prev => [...prev, alert.id]);
+                        } else {
+                          setSelectedAlerts(prev => prev.filter(id => id !== alert.id));
+                        }
+                      }}
+                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Alerts & Notifications</h1>
+          <p className="text-gray-600">Monitor and manage system alerts</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-500">Auto-refresh: 30s</p>
+        </div>
+      </div>
 
-                {/* Recent Violations */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Violations</h3>
-                  <div className="space-y-3">
-                    {policyViolations.slice(0, 5).map((violation) => (
-                      <div key={violation.id} className="flex items-start space-x-3 p-3 bg-white rounded-md">
-                        <AlertTriangle className={`w-4 h-4 mt-0.5 ${
-                          violation.severity === 'Critical' ? 'text-red-600' :
-                          violation.severity === 'High' ? 'text-orange-600' :
-                          violation.severity === 'Medium' ? 'text-yellow-600' : 'text-blue-600'
-                        }`} />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{violation.description}</p>
-                          <p className="text-xs text-gray-500">
-                            {violation.type} • {new Date(violation.detectedDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+      {/* Filters and Search */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Filter:</span>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Alerts</option>
+              <option value="active">Active</option>
+              <option value="acknowledged">Acknowledged</option>
+              <option value="resolved">Resolved</option>
+              <option value="dismissed">Dismissed</option>
+            </select>
+          </div>
+
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search alerts..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {selectedAlerts.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">{selectedAlerts.length} selected</span>
+              <button
+                onClick={() => handleBulkAction('acknowledge')}
+                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Acknowledge
+              </button>
+              <button
+                onClick={() => handleBulkAction('resolve')}
+                className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                Resolve
+              </button>
             </div>
           )}
+        </div>
+      </div>
 
-          {activeTab === 'checks' && (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="License Compliance">License Compliance</option>
-                  <option value="Security Compliance">Security Compliance</option>
-                  <option value="Regulatory Compliance">Regulatory Compliance</option>
-                  <option value="Policy Compliance">Policy Compliance</option>
-                </select>
-              </div>
+      {/* Alerts List */}
+      <div className="space-y-3">
+        {filteredAlerts.length === 0 ? (
+          <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+            <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No alerts found</h3>
+            <p className="text-gray-600">
+              {filter === 'all' ? 'No alerts to display' : `No ${filter} alerts found`}
+            </p>
+          </div>
+        ) : (
+          filteredAlerts.map((alert) => (
+            <div
+              key={alert.id}
+              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedAlerts.includes(alert.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAlerts(prev => [...prev, alert.id]);
+                      } else {
+                        setSelectedAlerts(prev => prev.filter(id => id !== alert.id));
+                      }
+                    }}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  
+                  <div className="flex-shrink-0 mt-1">
+                    {getAlertIcon(alert.type)}
+                  </div>
 
-              <div className="space-y-4">
-                {complianceChecks
-                  .filter(check => filterType === 'all' || check.type === filterType)
-                  .map((check) => (
-                    <div key={check.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3">
-                          <div className={`p-2 rounded-md ${getStatusColor(check.status)}`}>
-                            {getStatusIcon(check.status)}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">{check.type}</h4>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Last checked: {new Date(check.lastChecked).toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Next check: {new Date(check.nextCheck).toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Auditor: {check.auditor}
-                            </p>
-                            {check.notes && (
-                              <p className="text-sm text-gray-500 mt-2">{check.notes}</p>
-                            )}
-                          </div>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(check.status)}`}>
-                          {check.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'violations' && (
-            <div className="space-y-4">
-              {policyViolations.map((violation) => (
-                <div key={violation.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3">
-                      <AlertTriangle className={`w-5 h-5 mt-0.5 ${
-                        violation.severity === 'Critical' ? 'text-red-600' :
-                        violation.severity === 'High' ? 'text-orange-600' :
-                        violation.severity === 'Medium' ? 'text-yellow-600' : 'text-blue-600'
-                      }`} />
-                      <div>
-                        <h4 className="font-medium text-gray-900">{violation.description}</h4>
-                        <div className="mt-1 space-y-1 text-sm text-gray-600">
-                          <p>Type: {violation.type}</p>
-                          <p>Severity: {violation.severity}</p>
-                          <p>Detected: {new Date(violation.detectedDate).toLocaleDateString()}</p>
-                          <p>Assigned to: {violation.assignedTo}</p>
-                          {violation.resolvedDate && (
-                            <p>Resolved: {new Date(violation.resolvedDate).toLocaleDateString()}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        violation.status === 'Open' ? 'bg-red-100 text-red-800' :
-                        violation.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {violation.status}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {alert.title}
+                      </h3>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(alert.priority)}`}>
+                        {alert.priority}
                       </span>
-                      {violation.status === 'Open' && (
-                        <button
-                          onClick={() => handleResolveViolation(violation.id)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
-                        >
-                          Resolve
-                        </button>
-                      )}
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(alert.status)}`}>
+                        {alert.status}
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-2">{alert.message}</p>
+                    
+                    <div className="flex items-center space-x-4 text-xs text-gray-500">
+                      <span>Category: {alert.category}</span>
+                      {alert.assetName && <span>Asset: {alert.assetName}</span>}
+                      <span>Created: {new Date(alert.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {activeTab === 'audits' && (
-            <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Audit Reports</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">License Audit Report</h4>
-                    <p className="text-sm text-gray-600 mb-3">Complete audit of all software licenses</p>
-                    <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                      Generate Report
-                    </button>
-                  </div>
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Security Compliance</h4>
-                    <p className="text-sm text-gray-600 mb-3">Security policy compliance status</p>
-                    <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                      Generate Report
-                    </button>
-                  </div>
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Asset Compliance</h4>
-                    <p className="text-sm text-gray-600 mb-3">Asset management compliance audit</p>
-                    <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                      Generate Report
-                    </button>
-                  </div>
+                <div className="flex items-center space-x-2 ml-4">
+                  {alert.status === 'active' && (
+                    <>
+                      <button
+                        onClick={() => handleAlertAction(alert.id, 'acknowledge')}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Acknowledge"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleAlertAction(alert.id, 'resolve')}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Resolve"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  
+                  <button
+                    onClick={() => handleAlertAction(alert.id, 'dismiss')}
+                    className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  
+                  <button className="p-1 text-gray-600 hover:bg-gray-50 rounded transition-colors">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
-          )}
+          ))
+        )}
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Bell className="w-8 h-8 text-blue-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Total Alerts</p>
+              <p className="text-2xl font-semibold text-gray-900">{alerts.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Active</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {alerts.filter(a => a.status === 'active').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Resolved</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {alerts.filter(a => a.status === 'resolved').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="w-8 h-8 text-yellow-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Critical</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {alerts.filter(a => a.priority === 'critical').length}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default AlertsManager;
